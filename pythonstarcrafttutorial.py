@@ -1,10 +1,13 @@
-import sc2 
+import sc2
 from examples.protoss.cannon_rush import CannonRushBot
 from sc2 import run_game, maps, Race, Difficulty
 from sc2.player import Bot, Computer
 from sc2.constants import NEXUS, PROBE, PYLON, ASSIMILATOR, GATEWAY, CYBERNETICSCORE, STALKER, \
 STARGATE, VOIDRAY
 import random
+import cv2
+import numpy as np
+
 
 class SentdeBot(sc2.BotAI):
 	def __init__(self):
@@ -22,7 +25,20 @@ class SentdeBot(sc2.BotAI):
 		await self.offensive_force_buildings()
 		await self.build_offensive_forces()
 		await self.attack()
+		await self.intel()
 
+	async def intel(self):
+		"""creates a array of zeros of map_size dimentions, and of data type uint8"""
+		game_data = np.zeros((self.game_info.map_size[1], self.game_info.map_size[0], 3), np.uint8)
+		"""for each nexus, assign onto game_data a circle at coordinates nex_pos[0]"""
+		for nexus in self.units(NEXUS):
+			nex_pos = nexus.position
+			cv2.circle(game_data, (int(nex_pos[0]), int(nex_pos[1])), 10, (0, 255, 0), -1)
+
+		flipped = cv2.flip(game_data, 0)
+		resized = cv2.resize(flipped, dsize=None, fx=2, fy=2)
+		cv2.imshow('intel',resized)
+		cv2.waitKey(1)
 
 	"""builds workers when resources are available"""
 	async def build_workers(self):
@@ -68,24 +84,18 @@ class SentdeBot(sc2.BotAI):
 			if self.units(GATEWAY).ready.exists and not self.units(CYBERNETICSCORE):
 				if self.can_afford(CYBERNETICSCORE) and not self.already_pending(CYBERNETICSCORE):
 					await self.build(CYBERNETICSCORE, near=pylon)
-			elif len(self.units(GATEWAY)) < ((self.iteration / self.ITERATIONS_PER_MINUTE)/2):
+			elif len(self.units(GATEWAY)) < 1:
 				if self.can_afford(GATEWAY) and not self.already_pending(GATEWAY):
 					await self.build(GATEWAY, near=pylon)
 
 			"""if cybernetics core exists and the amount of stargates is less than half the amount of minutes elapsed, build stargate"""		
 			if self.units(CYBERNETICSCORE).ready.exists:
-				if len(self.units(STARGATE)) < ((self.iteration / self.ITERATIONS_PER_MINUTE)/2):
+				if len(self.units(STARGATE)) < (self.iteration / self.ITERATIONS_PER_MINUTE):
 					if self.can_afford(STARGATE) and not self.already_pending(STARGATE):
 						await self.build(STARGATE, near=pylon)
 
 	"""builds stalker units"""
 	async def build_offensive_forces(self):
-
-		"""if there are no gateways in queue and there are more stalkers than voidrays and you can afford to, build stalkers"""
-		for gw in self.units(GATEWAY).ready.noqueue:
-			if not self.units(STALKER).amount > self.units(VOIDRAY).amount:
-				if self.can_afford(STALKER) and self.supply_left > 0:
-					await self.do(gw.train(STALKER))
 
 		"""if there are no stargates in queue and you can afford to, build voidray"""
 		for sg in self.units(STARGATE).ready.noqueue:
@@ -105,8 +115,7 @@ class SentdeBot(sc2.BotAI):
 	find target and attack"""
 	async def attack(self):
 		# {UNIT: [n to fight, n to defend]}
-		aggressive_units = {STALKER: [15, 5], 
-							VOIDRAY: [8, 3]}
+		aggressive_units = {VOIDRAY: [8, 3]}
 
 		for UNIT in aggressive_units:
 			"""if the number of UNITS are bigger than the amount assigned for both defence and attack, then attack.else, if the number of UNITS is bigger than the number assigned for defence, then defend"""
