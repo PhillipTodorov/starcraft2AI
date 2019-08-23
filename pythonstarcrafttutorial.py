@@ -11,7 +11,7 @@ import time
 
 HEADLESS = False 
 
-
+ 
 class SentdeBot(sc2.BotAI):
 	def __init__(self):
 		self.ITERATIONS_PER_MINUTE = 165
